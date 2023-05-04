@@ -1,151 +1,158 @@
+import fs from 'fs'
 
-const fs = require ('fs');
-
-class ProductManager {
-    constructor() {
-        this.products = [];
-        this.path = "./files/Products.JSON"
+export default class Product {
+    constructor(path) {
+        this.path = path
+        this.products = []
     }
 
-//Bien
-setId() {
-  try {
-      let idProduct = 1
-      if (this.products.length > 0) {
-          idProduct = (Math.max(...this.products.map(product => product.idProduct))) + 1
-      }
-      return idProduct
-  }
-  catch (err) {
-      console.log(err)
-  }
-      
-}
 
-//Bien
-async getAll(){
-  try{
-      const data = await fs.promises.readFile(this.path, "utf-8")
-      const products = JSON.parse(data);
-      return products;
-  } 
-  catch(err) {
-      console.log(err)
-  }
-}
+    setId() {
+        try {
+            let id = 1
+            if (this.products.length > 0) {
+                id = (Math.max(...this.products.map(product => product.id))) + 1
+            }
 
-//bien
-async getFiltered(id) {
-  try{
-    let products = await this.getAll()
-    products = products.filter(item => item.idProduct <= id)
-    return products
-  }
-  catch(err){
-    console.log(err)
-  }
-}
-
-//Bien
-async getProductById(id) {
-  try{
-  let products = await this.getAll()
-  products = products.filter(item => item.idProduct == id)
-  if (products.length) {
-      return products[0]
-  } else { 
-      console.log("product not founded")
-  }
-}
-catch (err) {
-  console.log (err)
-}}
-
-//bien
-async addProduct(newProduct) {
-  try{
-    this.products = await this.getAll()
-    this.validateProperties(newProduct) 
-    newProduct.idProduct = this.setId()
-    if(newProduct){
-    this.products.push(newProduct)
-    await fs.promises.writeFile(this.path, JSON.stringify(this.products))
-    return console.log('product added')}
-    else{
-      console.log(newProduct.length)
+            return id
+        }
+        catch (error) {
+            console.log(`ERROR: ${error}`)
+        }
+        
     }
-  }catch(err){
-    console.log(err)
-  }
-}
 
 
+    validateProperties(product) {
+        const properties = ['title', 'description', 'price', 'thumbnail', 'code', 'stock']
+         let status = {status: 'successful', error: ''}
 
 
-  //incompleto
-  async putProduct(id, newValues) {
-    try {
-        let oldProduct = (await this.getProductById(id)).value
+        for (let property in properties) {
+            if (!(properties[property] in product)) {
+                status.status = 'failed'
+                status.error += `Mandatory property ${properties[property]} missing`
+            }
+        }
 
-        Object.keys(newValues).forEach(properties => {
-            if (this.validateProperties(properties, oldProduct)) {
-                oldProduct[properties] = newValues[properties]
+
+        Object.keys(product).forEach(property => {
+            if (!(properties.includes(property))) {
+                status.status = 'failed'
+                status.error += `Property ${property} is not valid for this product. `
             }
         });
-       
-        let products = (await this.getAll()).filter(item => item.idProduct != id)
-        products.push(oldProduct)
-        await fs.promises.writeFile(this.path, JSON.stringify(products))
 
-        return console.log("product updated")
-    }
-    catch (err) {
-      console.log(err)
+        
+        if (status.status == 'successful') {
+            return true
+        } 
+        else {
+            throw status 
         }
     }
 
 
+    validateProperty(property, product) {
+        if ((property == 'id') || !(property in product)) {
+            
+            throw new Error (`Property ${property} is not valid`)
+        }
+        
+        return true
+    }
 
 
+    validateCode(code) {
+        const product = this.products.filter(item => item.code == code)
+        if (product.length) {
+            throw new Error(`Code ${product[0].code} already exists`)
+        } else { 
+            return true
+        }
+    }
 
-//Bien
-async deleteProduct(id){
-  try{
-    if(id >= 1){
-    let products = (await this.getAll()).filter(item => item.idProduct != id)
-    await fs.promises.writeFile(this.path, JSON.stringify(products))
-    return console.log("product deleted")}
 
-    else{ console.log("wrong params")
-    }}
-    catch (err){
-      console.log(err)   
+    async getProducts(limit = undefined) {
+        this.products = await fs.promises.readFile(this.path)
+        if (this.products.length == 0) {
+            this.products = []
+        }
+        else {
+            this.products = JSON.parse(this.products)
+            
+            this.products = (limit != undefined ? this.products.filter(item => item.id <= limit) : this.products)
+        }
+        return this.products
+    }
+
+
+    async addProduct(product) {
+        try{
+            this.products = await this.getProducts()
+            this.validateProperties(product)
+            this.validateCode(product.code)
+            product.id = this.setId()
+            this.products.push(product)
+            await fs.promises.writeFile(this.path, JSON.stringify(this.products))
+            return {status: 'successful', value: product}
+        }catch (error) {
+            console.log (`ERROR adding product ${JSON.stringify(product)}. Msg: ${error.error}`)
+            return {status: 'failed', error: `ERROR adding product ${JSON.stringify(product)}. Msg: ${JSON.stringify(error)}`}
+        }        
+    }
+    
+
+    async getProductById(id) {
+        try{
+            let products = await this.getProducts()
+            products = products.filter(item => item.id == id)
+            if (products.length) {
+                return {status: 'successful', value: products[0]}
+            } else { 
+                throw new Error(`ID ${id} not found`)
+            }
+        }
+        catch (error) {
+            console.log (`ERROR getting product with id ${id}. Msg: ${error}`)
+            return {status: 'failed', error: `ERROR getting product with id ${id}. Msg: ${error}`}
+            
+        }
+    }
+
+
+    async updateProduct(id, newValues) {
+        try {
+            let oldProduct = (await this.getProductById(id)).value
+
+            Object.keys(newValues).forEach(property => {
+                if (this.validateProperty(property, oldProduct)) {
+                    oldProduct[property] = newValues[property]
+                }
+            });
+           
+            let products = (await this.getProducts()).filter(item => item.id != id)
+            products.push(oldProduct)
+            await fs.promises.writeFile(this.path, JSON.stringify(products))
+
+            return {status: 'successful', value: oldProduct}
+        }
+        catch (error) {
+            return {status: 'failed', error: `there is an invalid property trying to be modified.`}
+        }
+
+    }
+
+    async deleteProduct(id) {
+        try {
+            let products = (await this.getProducts()).filter(item => item.id != id)
+            await fs.promises.writeFile(this.path, JSON.stringify(products))
+
+            return {status: 'successful', value: `Product ${id} deleted`}
+        }
+        catch (error) {
+            console.log (`ERROR deleting product ${id}. Msg: ${error}`)
+            return {status: 'failed', error: `ERROR deleting product ${id}. Msg: ${error}`} 
+        }
+    }
 }
-}
-
-    validateProperties(product) {
-      const properties = ['title', 'description', 'price', 'thumbnail', 'code', 'stock', 'category', 'status']
-
-      for (let property in properties) {
-          if (!(properties[property] in product)) {
-              console.log("missing properties")
-          }
-      }
-
-      Object.keys(product).forEach(property => {
-          if (!(properties.includes(property))) {
-            console.log("missing properties")
-          }
-      });
- 
-      if (product) {
-          return true
-      } 
-      else {
-          console.log("error") 
-      }
-  }
-
-}
-
-module.exports = ProductManager;

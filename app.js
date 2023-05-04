@@ -1,26 +1,43 @@
-const express = require('express');
-import { engine } from 'express-handlebars';
+//import
+import express from 'express'
+import handlebars from 'express-handlebars'
+import __dirname from '../src/utils.js'
+import {Server} from 'socket.io'
+import viewsRouter from './routes/views.router.js'
 
-const routerp = require('./routes/products.routes');
-const routerc = require('./routes/cart.routes');
+//express
+const app = express()
 const PORT = 8080
+let productsList = []
 
-const server = express();
+const filePathProduct = `./files/Products.JSON`
 
-server.use(express.json())
-server.use(express.urlencoded({extended:true}))
-
-//server.use('/api', routerp);
-//server.use('/api', routerc);
-
-server.engine('handlebars', engine());
-server.set('view engine', 'handlebars');
-server.set('views', './views');
-
-server.get('/', (req,res) => {
-    res.render('index');
+const server = app.listen(PORT, () => {
+    console.log(`Listening on port ${PORT}`)
 })
+const socketServer = new Server(server)
 
-server.listen(PORT, () =>{
-    console.log(`Server listening at port ${PORT}`)
-});
+
+app.engine('handlebars', handlebars.engine())
+
+app.set('views', __dirname + '/views')
+app.set('view engine', 'handlebars')
+
+app.use(express.static(__dirname + '/public'))
+app.use(express.json());
+app.use(express.urlencoded({extended:true}))
+
+
+app.use('/', viewsRouter)
+
+socketServer.on('connection', socket => {
+    console.log("New connection started")
+
+    socket.emit('productsList', productsList)
+
+    socket.on('addProduct', () => {
+        
+        io.sockets.emit('productsList', productsList)
+    });
+
+})
