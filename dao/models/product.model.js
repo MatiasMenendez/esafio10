@@ -1,39 +1,21 @@
 import mongoose from "mongoose"
 
-const productsCollection = 'products'
+const collection = 'products'
 
 const productSchema = new mongoose.Schema({
     id: mongoose.ObjectId,
-    title: {
-        type: String,
-        required: true
-    },
-    description: {
-        type: String,
-        required: true
-    },
-    code: {
-        type: String,
-        unique: true,
-        required: true
-    },
-    price: { 
-        type: Number,
-        required: true
-    },
+    title:String,
+    description:String,
+    code: String,
+    price: Number,
+        
     status: Boolean,
-    stock: {
-        type: Number,
-        required: true
-    },
+    stock: Number,
     category: String,
-    thumbnails: {
-        type: [String],
-        required: true,
-        default: []
-    }
+    thumbnails:String
+        
 })
 
-const productModel = mongoose.model(productsCollection, productSchema)
+const productModel = mongoose.model(collection, productSchema)
 
 export default productModel
